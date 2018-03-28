@@ -1,0 +1,12 @@
+{
+    "urls": {
+        "rest service": {
+            "url": "https://example.com/app/to/check",
+            "interval": "20000"
+        },
+        "Website": {
+            "url": "https://example.com",
+            "interval": "3000"
+        }
+    }
+}

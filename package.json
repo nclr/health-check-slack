@@ -1,0 +1,19 @@
+{
+  "name": "health-check-slack",
+  "version": "1.0.0",
+  "description": "Health check app with Slack Notification",
+  "main": "index.js",
+  "dependencies": {
+    "@slack/client": "^4.1.0",
+    "fs": "0.0.1-security",
+    "http": "0.0.0",
+    "https": "^1.0.0",
+    "request": "^2.85.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC"
+}
