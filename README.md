@@ -2,7 +2,9 @@
 Simple Node app to do health checks on 1 or more urls and send notifications to a slack channel
 
 ## Install :star2::package:
-npm i health-check-slack
+git clone https://github.com/nclr/health-check-slack.git
+cd health-check-slack
+npm install
 
 # Usage :sparkles::rocket:
 Simply edit config.json and add the urls to check along with the desired interval (in milliseconds) for each loop like the example below:
