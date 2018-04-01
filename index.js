@@ -2,14 +2,15 @@ var fs = require('fs');
 var http = require('http');
 var https = require('https');
 var request = require('request');
+var emoji = require('node-emoji')
 
 const {
     IncomingWebhook
 } = require('@slack/client');
 const url = process.env.SLACK_WEBHOOK_URL;
-const webhook = new IncomingWebhook(webhookurl);
 
 const webhookurl = "https://hooks.slack.com/services/<some-sort-of-secret-key>";
+const webhook = new IncomingWebhook(webhookurl);
 var notReachable = {};
 
 /* Read configuration and start loops */
@@ -38,15 +39,17 @@ function createloop(name, url, interval) {
             if (!error && response.statusCode == 200) {
                 if (typeof notReachable[name] != "undefined") {
                     delete notReachable[name];
-                    var message = name + " is reachable again!";
+                    var message = name + " " + emoji.get('beers') + " " + getFormattedDate();
                     send(message);
                     console.log(message);
                 }
             } else {
-                notReachable[name] = "true";
-                var message = name + ' is not reachable! ';
-                console.log(message);
-                send(message);
+		if (typeof notReachable[name] == "undefined") {
+                    notReachable[name] = "true";
+                    var message = name + " " + emoji.get('hankey')  + " " + getFormattedDate();
+                    console.log(message);
+                    send(message);
+		}
             }
         });
     }, interval);
@@ -61,4 +64,25 @@ function send(text) {
             console.log('Message sent: ', res);
         }
     });
+}
+
+/* Get Timestamp */
+function getFormattedDate() {
+    var date = new Date();
+
+    var month = date.getMonth() + 1;
+    var day = date.getDate();
+    var hour = date.getHours();
+    var min = date.getMinutes();
+    var sec = date.getSeconds();
+
+    month = (month < 10 ? "0" : "") + month;
+    day = (day < 10 ? "0" : "") + day;
+    hour = (hour < 10 ? "0" : "") + hour;
+    min = (min < 10 ? "0" : "") + min;
+    sec = (sec < 10 ? "0" : "") + sec;
+
+    var str = '[' + day + "-" + month +  "-" + date.getFullYear()  + "_" +  hour + ":" + min + ":" + sec + ']';
+
+    return str;
 }
