@@ -8,6 +8,7 @@
     "fs": "0.0.1-security",
     "http": "0.0.0",
     "https": "^1.0.0",
+    "node-emoji": "^1.8.1",
     "request": "^2.85.0"
   },
   "devDependencies": {},
