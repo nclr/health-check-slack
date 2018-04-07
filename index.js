@@ -12,6 +12,8 @@ const url = process.env.SLACK_WEBHOOK_URL;
 const webhookurl = "https://hooks.slack.com/services/<some-sort-of-secret-key>";
 const webhook = new IncomingWebhook(webhookurl);
 var notReachable = {};
+var notReachabletwice = {};
+
 
 /* Read configuration and start loops */
 fs.readFile('./config.json', 'utf8', function (err, data) {
@@ -44,12 +46,17 @@ function createloop(name, url, interval) {
                     console.log(message);
                 }
             } else {
-		if (typeof notReachable[name] == "undefined") {
+                if (typeof notReachable[name] == "undefined") { // first time
                     notReachable[name] = "true";
-                    var message = name + " " + emoji.get('hankey')  + " " + getFormattedDate();
+                    var message = name + " " + emoji.get('hankey') + " " + getFormattedDate();
+                    console.log("first time :" + message);
+
+                } else if (notReachable[name] == "true") { // secondtime
+                    notReachable[name] = "notagain"; // we don't want second notification
+                    var message = name + " " + emoji.get('hankey') + " " + getFormattedDate();
                     console.log(message);
                     send(message);
-		}
+                }
             }
         });
     }, interval);
@@ -82,7 +89,7 @@ function getFormattedDate() {
     min = (min < 10 ? "0" : "") + min;
     sec = (sec < 10 ? "0" : "") + sec;
 
-    var str = '[' + day + "-" + month +  "-" + date.getFullYear()  + "_" +  hour + ":" + min + ":" + sec + ']';
+    var str = '[' + day + "-" + month + "-" + date.getFullYear() + "_" + hour + ":" + min + ":" + sec + ']';
 
     return str;
 }
