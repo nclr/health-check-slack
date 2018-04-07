@@ -24,5 +24,6 @@ Simply edit config.json and add the urls to check along with the desired interva
 ```
 Then set up an [Incoming Webhook](https://api.slack.com/incoming-webhooks) to one of your slack channels and you're good to go! :wink:
 
+
 # Error Handling
-When a 404 status code incurs it sends "LinkName is not reachable!" and when the error with the specified link is resolved (and a 200 status code is returned) it automatically responds with "LinkName is reachable again!"
+When a 404 status code incurs it sends "LinkName is not reachable!" and when the error with the specified link is resolved (and a 200 status code is returned) it automatically responds with "LinkName is reachable again!". Every "fail" notification requires at least two failed attempts in a row to reach the desired URL. This minimizes the possibility of some temporary connection problem on the health-check server masqueraded as a URL problem.
