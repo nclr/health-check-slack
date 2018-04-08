@@ -40,10 +40,12 @@ function createloop(name, url, interval) {
         }, function (error, response, body) {
             if (!error && response.statusCode == 200) {
                 if (typeof notReachable[name] != "undefined") {
+                  if (notReachable[name] == "notagain") {
                     delete notReachable[name];
                     var message = name + " " + emoji.get('beers') + " " + getFormattedDate();
                     send(message);
                     console.log(message);
+                  }
                 }
             } else {
                 if (typeof notReachable[name] == "undefined") { // first time
