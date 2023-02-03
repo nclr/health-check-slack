@@ -1,0 +1,23 @@
+{
+    "urls": {
+        "Rest service": {
+            "url": "https://example.com/app/to/check",
+            "interval": 60000
+        },
+        "Website": {
+            "url": "https://example.com",
+            "interval": 30000,
+            "minTimeOfDay": "06:30",
+            "maxTimeOfDay": "21:50",
+            "daysOfTheWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+            "mentionsWhenDown": [
+                { "user": "U024BE7LH" },
+                { "group", "SAZ94GDB8" }
+            ],
+            "requestConfig": {
+                "timeout": 10000,
+                "followRedirect": true
+            }
+        }
+    }
+}

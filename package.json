@@ -4,14 +4,13 @@
   "description": "Health check app with Slack Notification",
   "main": "index.js",
   "dependencies": {
-    "@slack/client": "^4.1.0",
-    "fs": "0.0.1-security",
-    "http": "0.0.0",
-    "https": "^1.0.0",
-    "node-emoji": "^1.8.1",
+    "moment": "^2.29.4",
+    "moment-duration-format": "^2.3.2",
     "request": "^2.85.0"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "dotenv": "^16.0.0"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

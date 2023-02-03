@@ -1,97 +1,215 @@
 var fs = require('fs');
-var http = require('http');
-var https = require('https');
 var request = require('request');
-var emoji = require('node-emoji')
+var moment = require('moment');
 
-const {
-    IncomingWebhook
-} = require('@slack/client');
-const url = process.env.SLACK_WEBHOOK_URL;
+const UrlStatus = {
+    Up: 'Up',
+    Pending: 'Pending',
+    StillDown: 'StillDown',
+};
 
-const webhookurl = "https://hooks.slack.com/services/<some-sort-of-secret-key>";
-const webhook = new IncomingWebhook(webhookurl);
-var notReachable = {};
-var notReachabletwice = {};
+Object.freeze(UrlStatus);
 
+const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+const urlContainer = {};
+const urlErrorContainer = {};
 
 /* Read configuration and start loops */
 fs.readFile('./config.json', 'utf8', function (err, data) {
     if (err) throw err;
-    var conf = JSON.parse(data);
-    var urls = conf.urls;
+    const conf = JSON.parse(data);
+    const urls = conf.urls;
 
-    for (var name in urls) {
-        var url = urls[name].url;
-        var interval = urls[name].interval;
-        createloop(name, url, interval);
+    for (const [name, params] of Object.entries(urls)) {
+        createLoop(name, params);
     }
 });
 
 /* Create a loop that's executed every x milliseconds */
-function createloop(name, url, interval) {
-    var requestLoop = setInterval(function () {
-        request({
-            url: url,
-            method: "GET",
-            timeout: 10000,
-            followRedirect: true,
-            maxRedirects: 10
-        }, function (error, response, body) {
-            if (!error && response.statusCode == 200) {
-                if (typeof notReachable[name] != "undefined") {
-                  if (notReachable[name] == "notagain") {
-                    delete notReachable[name];
-                    var message = name + " " + emoji.get('beers') + " " + getFormattedDate();
-                    send(message);
-                    console.log(message);
-                  }
-                }
-            } else {
-                if (typeof notReachable[name] == "undefined") { // first time
-                    notReachable[name] = "true";
-                    var message = name + " " + emoji.get('hankey') + " " + getFormattedDate();
-                    console.log("first time :" + message);
+function createLoop(name, params) {
+    const dateBounds = {
+        minTimeOfDay: params.minTimeOfDay,
+        maxTimeOfDay: params.maxTimeOfDay,
+        daysOfTheWeek: params.daysOfTheWeek
+    }
 
-                } else if (notReachable[name] == "true") { // secondtime
-                    notReachable[name] = "notagain"; // we don't want second notification
-                    var message = name + " " + emoji.get('hankey') + " " + getFormattedDate();
-                    console.log(message);
-                    send(message);
-                }
+    const defaultRequestConfig = {
+        timeout: 10000,
+        followRedirect: true,
+        maxRedirects: 10
+    };
+
+    setInterval(function () {
+        const requestDate = new Date();
+
+        if (!isDateWithinBounds(requestDate, dateBounds)) {
+            urlContainer[name] = undefined;
+            return;
+        }
+
+        const requestConfig = {
+            ...defaultRequestConfig,
+            ...params.requestConfig,
+            url: params.url
+        };
+
+        request.get(requestConfig, function (error, response, body) {
+            const responseDate = new Date();
+
+            if (error !== null) {
+                handleLocalError(name, responseDate);
+            } else if (response.statusCode === 200) {
+                handleSuccessStatus(name, params.url, responseDate);
+            } else {
+                handleDownStatus(name, params, responseDate);
             }
         });
-    }, interval);
+    }, params.interval);
+}
+
+function handleSuccessStatus(urlName, urlValue, responseDate) {
+    if (urlContainer[urlName] === undefined) {
+        const message = "First check of this session... Endpoint is running! :beer:";
+        send(message);
+        console.log(`${getFormattedDate(responseDate)} - ${message}`);
+    } else {
+        if (urlErrorContainer[urlName] !== undefined) {
+            restoreLocalErrorAndSend(responseDate, urlName);
+        }
+
+        if (urlContainer[urlName] !== UrlStatus.Up) {
+            const message = `:globe_with_meridians: ${urlName} (${urlValue}) is up and running!`;
+            send(message);
+            console.log(`${getFormattedDate(responseDate)} - ${message}`);
+        }
+    }
+
+    urlContainer[urlName] = UrlStatus.Up;
+}
+
+function handleLocalError(urlName, responseDate) {
+    console.log('Local error, couldn\'t reach endpoint.');
+
+    if (urlErrorContainer[urlName] === undefined) {
+        urlErrorContainer[urlName] = responseDate;
+    }
+}
+
+function handleDownStatus(urlName, params, responseDate) {
+    const trailingMentions = buildMentionsForDownStatus(params.mentionsWhenDown);
+    const message = `:warning: Oh no! It looks like ${urlName} (${params.url}) is down.\n${trailingMentions}`;
+    console.log(`${getFormattedDate(responseDate)} - ${message}`);
+
+    if (urlContainer[urlName] === undefined) {
+        send("First check of this session... Endpoint didn't respond :confused:");
+        urlContainer[urlName] = UrlStatus.Pending;
+        return;
+    }
+
+    if (urlErrorContainer[urlName] !== undefined) {
+        restoreLocalErrorAndSend(responseDate, urlName);
+    }
+
+    if (urlContainer[urlName] === UrlStatus.Up) {
+        // First fail! Try again, maybe this was temporary.
+        urlContainer[urlName] = UrlStatus.Pending;
+    } else if (urlContainer[urlName] === UrlStatus.Pending) {
+        // Two fails in a row! Send message, the endpoint is down.
+        urlContainer[urlName] = UrlStatus.Down;
+        send(message);
+    }
+}
+
+function buildMentionsForDownStatus(mentions) {
+    if (mentions === undefined) return '';
+
+    return mentions.reduce((total, mention, index) => {
+        if (mention.user === undefined || mention.group === undefined) return total;
+
+        const leadingText = (index === 0) ? 'cc: ' : ', ';
+        const trailingText = (mention.user) ? `<@${mention.id}>` : `<!subteam^${mention.id}>`;
+
+        return `${total}${leadingText}${trailingText}`
+    }, '');
 }
 
 /* Send message to slack incoming webhook */
 function send(text) {
-    webhook.send(text, function (err, res) {
-        if (err) {
-            console.log('Error:', err);
-        } else {
-            console.log('Message sent: ', res);
+    console.log(webhookUrl);
+    request.post(
+        webhookUrl,
+        {
+            json: { text: text }
+        },
+        function (err, res) {
+            if (err) {
+                console.log(`Error: ${err}`)
+            } else {
+                console.log(`Message sent: ${res}`)
+            }
         }
-    });
+    );
+}
+
+function restoreLocalErrorAndSend(currentDate, urlName) {
+    const localErrorSince = urlErrorContainer[urlName];
+
+    if (localErrorSince === undefined) return;
+
+    const durationInLocalError = moment.duration(moment(currentDate).diff(moment(localErrorSince)))
+    const hasBeenMoreThanOneMinute = durationInLocalError.asSeconds() > 60
+
+    if (hasBeenMoreThanOneMinute) {
+        const formattedDuration = durationInLocalError.format('hh:mm:ss')
+        const message = `Health-check was off for ${formattedDuration}.`;
+        send(message);
+    }
+
+    urlErrorContainer[urlName] = undefined;
 }
 
 /* Get Timestamp */
-function getFormattedDate() {
-    var date = new Date();
+function getFormattedDate(date) {
+    return moment(date).format("DD-MM-YYYY_H:mm:ss")
+}
 
-    var month = date.getMonth() + 1;
-    var day = date.getDate();
-    var hour = date.getHours();
-    var min = date.getMinutes();
-    var sec = date.getSeconds();
+const parseTimeRe = /^([0-1]\d|2[0-3]):([0-5]\d)$/;
 
-    month = (month < 10 ? "0" : "") + month;
-    day = (day < 10 ? "0" : "") + day;
-    hour = (hour < 10 ? "0" : "") + hour;
-    min = (min < 10 ? "0" : "") + min;
-    sec = (sec < 10 ? "0" : "") + sec;
+function parseTime(str) {
+    const match = parseTimeRe.exec(str);
+    if (!match) {
+        return undefined;
+    }
+    return [parseInt(match[1], 10), parseInt(match[2], 10)];
+}
 
-    var str = '[' + day + "-" + month + "-" + date.getFullYear() + "_" + hour + ":" + min + ":" + sec + ']';
+const daysOfTheWeek = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
+];
 
-    return str;
+function areArrayMembersLessOrEqual(a, b) {
+    return a.every(function (value, index) {
+        return value <= b[index];
+    });
+}
+
+function isDateWithinBounds(date, bounds) {
+    const currentTimeOfDay = [date.getHours(), date.getMinutes()];
+    const minTimeOfDay = parseTime(bounds.minTimeOfDay);
+    const maxTimeOfDay = parseTime(bounds.maxTimeOfDay);
+
+    if (minTimeOfDay && !areArrayMembersLessOrEqual(minTimeOfDay, currentTimeOfDay)) return false;
+    if (maxTimeOfDay && !areArrayMembersLessOrEqual(currentTimeOfDay, maxTimeOfDay)) return false;
+
+    const dayOfTheWeek = daysOfTheWeek[date.getDay()];
+
+    if (bounds.daysOfTheWeek !== undefined && !bounds.daysOfTheWeek.includes(dayOfTheWeek)) return false;
+
+    return true;
 }
