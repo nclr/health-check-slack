@@ -55,11 +55,11 @@ function createLoop(name, params) {
 
         request.get(requestConfig, function (error, response, body) {
             const responseDate = new Date();
-
+''
             if (error !== null) {
                 handleLocalError(name, responseDate);
             } else if (response.statusCode === 200) {
-                handleSuccessStatus(name, params.url, responseDate);
+                handleSuccessStatus(name, params, responseDate);
             } else {
                 handleDownStatus(name, params, responseDate);
             }
@@ -67,18 +67,18 @@ function createLoop(name, params) {
     }, params.interval);
 }
 
-function handleSuccessStatus(urlName, urlValue, responseDate) {
+function handleSuccessStatus(urlName, params, responseDate) {
     if (urlContainer[urlName] === undefined) {
         const message = "First check of this session... Endpoint is running! :beer:";
         send(message);
         console.log(`${getFormattedDate(responseDate)} - ${message}`);
     } else {
         if (urlErrorContainer[urlName] !== undefined) {
-            restoreLocalErrorAndSend(responseDate, urlName);
+            restoreLocalErrorAndSend(responseDate, urlName, params.localErrorReportThreshold);
         }
 
         if (urlContainer[urlName] !== UrlStatus.Up) {
-            const message = `:globe_with_meridians: ${urlName} (${urlValue}) is up and running!`;
+            const message = `:globe_with_meridians: ${urlName} (${params.urlValue}) is up and running!`;
             send(message);
             console.log(`${getFormattedDate(responseDate)} - ${message}`);
         }
@@ -88,7 +88,7 @@ function handleSuccessStatus(urlName, urlValue, responseDate) {
 }
 
 function handleLocalError(urlName, responseDate) {
-    console.log('Local error, couldn\'t reach endpoint.');
+    console.error('Local error, couldn\'t reach endpoint.');
 
     if (urlErrorContainer[urlName] === undefined) {
         urlErrorContainer[urlName] = responseDate;
@@ -143,24 +143,25 @@ function send(text) {
         },
         function (err, res) {
             if (err) {
-                console.log(`Error: ${err}`)
+                console.error(err);
             } else {
-                console.log(`Message sent: ${res}`)
+                console.log(`Message sent: ${res}`);
             }
         }
     );
 }
 
-function restoreLocalErrorAndSend(currentDate, urlName) {
+function restoreLocalErrorAndSend(currentDate, urlName, localErrorReportThreshold) {
     const localErrorSince = urlErrorContainer[urlName];
 
     if (localErrorSince === undefined) return;
 
-    const durationInLocalError = moment.duration(moment(currentDate).diff(moment(localErrorSince)))
-    const hasBeenMoreThanOneMinute = durationInLocalError.asSeconds() > 60
+    const reportThreshold = localErrorReportThreshold || 60000;
+    const durationInLocalError = moment.duration(moment(currentDate).diff(moment(localErrorSince)));
+    const hasBeenMoreThanOneMinute = durationInLocalError.asMilliseconds() > reportThreshold;
 
     if (hasBeenMoreThanOneMinute) {
-        const formattedDuration = durationInLocalError.format('hh:mm:ss')
+        const formattedDuration = durationInLocalError.format('hh:mm:ss');
         const message = `Health-check was off for ${formattedDuration}.`;
         send(message);
     }
@@ -173,24 +174,25 @@ function getFormattedDate(date) {
     return moment(date).format("DD-MM-YYYY_H:mm:ss")
 }
 
-const parseTimeRe = /^([0-1]\d|2[0-3]):([0-5]\d)$/;
+const parseTimeRe = /^(\d|[0-1]\d|2[0-3]):([0-5]\d)\s*(|am|pm)$/i;
 
 function parseTime(str) {
     const match = parseTimeRe.exec(str);
     if (!match) {
         return undefined;
     }
-    return [parseInt(match[1], 10), parseInt(match[2], 10)];
+    const offset = match[3].toLowerCase() === 'pm' ? 12 : 0;
+    return [parseInt(match[1], 10) + offset, parseInt(match[2], 10)];
 }
 
 const daysOfTheWeek = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday'
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+    'friday',
+    'saturday',
+    'sunday'
 ];
 
 function areArrayMembersLessOrEqual(a, b) {
@@ -207,9 +209,12 @@ function isDateWithinBounds(date, bounds) {
     if (minTimeOfDay && !areArrayMembersLessOrEqual(minTimeOfDay, currentTimeOfDay)) return false;
     if (maxTimeOfDay && !areArrayMembersLessOrEqual(currentTimeOfDay, maxTimeOfDay)) return false;
 
-    const dayOfTheWeek = daysOfTheWeek[date.getDay()];
+    const dayOfTheWeek = daysOfTheWeek[date.getDay().toLowerCase()];
 
-    if (bounds.daysOfTheWeek !== undefined && !bounds.daysOfTheWeek.includes(dayOfTheWeek)) return false;
+    if (
+        bounds.daysOfTheWeek &&
+        !bounds.daysOfTheWeek.some((value) => value.toLowerCase() === dayOfTheWeek.slice(0, value.length))
+    ) return false;
 
     return true;
 }
