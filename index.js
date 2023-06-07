@@ -16,6 +16,13 @@ const dateTimeFormat = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
 });
 
+const defaultRequestConfig = {
+    timeout: 10000,
+    followRedirect: true,
+    maxRedirects: 10
+};
+
+
 const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 const urlContainer = {};
 const urlErrorContainer = {};
@@ -39,12 +46,6 @@ function createLoop(name, params) {
         daysOfTheWeek: params.daysOfTheWeek
     }
 
-    const defaultRequestConfig = {
-        timeout: 10000,
-        followRedirect: true,
-        maxRedirects: 10
-    };
-
     setInterval(function () {
         const requestDate = new Date();
 
@@ -61,7 +62,7 @@ function createLoop(name, params) {
 
         request.get(requestConfig, function (error, response, body) {
             const responseDate = new Date();
-''
+
             if (error !== null) {
                 handleLocalError(name, responseDate);
             } else if (response.statusCode === 200) {
