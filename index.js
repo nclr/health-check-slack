@@ -1,6 +1,5 @@
 var fs = require('fs');
-var request = require('request');
-var moment = require('moment');
+var request = require("request");
 
 const UrlStatus = {
     Up: 'Up',
@@ -9,6 +8,13 @@ const UrlStatus = {
 };
 
 Object.freeze(UrlStatus);
+
+const dateTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
 
 const webhookUrl = process.env.SLACK_WEBHOOK_URL;
 const urlContainer = {};
@@ -71,7 +77,7 @@ function handleSuccessStatus(urlName, params, responseDate) {
     if (urlContainer[urlName] === undefined) {
         const message = "First check of this session... Endpoint is running! :beer:";
         send(message);
-        console.log(`${getFormattedDate(responseDate)} - ${message}`);
+        console.log(`${dateTimeFormat.format(responseDate)} - ${message}`);
     } else {
         if (urlErrorContainer[urlName] !== undefined) {
             restoreLocalErrorAndSend(responseDate, urlName, params.localErrorReportThreshold);
@@ -80,7 +86,7 @@ function handleSuccessStatus(urlName, params, responseDate) {
         if (urlContainer[urlName] !== UrlStatus.Up) {
             const message = `:globe_with_meridians: ${urlName} (${params.urlValue}) is up and running!`;
             send(message);
-            console.log(`${getFormattedDate(responseDate)} - ${message}`);
+            console.log(`${dateTimeFormat.format(responseDate)} - ${message}`);
         }
     }
 
@@ -98,7 +104,7 @@ function handleLocalError(urlName, responseDate) {
 function handleDownStatus(urlName, params, responseDate) {
     const trailingMentions = buildMentionsForDownStatus(params.mentionsWhenDown);
     const message = `:warning: Oh no! It looks like ${urlName} (${params.url}) is down.\n${trailingMentions}`;
-    console.log(`${getFormattedDate(responseDate)} - ${message}`);
+    console.log(`${dateTimeFormat.format(responseDate)} - ${message}`);
 
     if (urlContainer[urlName] === undefined) {
         send("First check of this session... Endpoint didn't respond :confused:");
@@ -127,7 +133,7 @@ function buildMentionsForDownStatus(mentions) {
         if (mention.user === undefined || mention.group === undefined) return total;
 
         const leadingText = (index === 0) ? 'cc: ' : ', ';
-        const trailingText = (mention.user) ? `<@${mention.id}>` : `<!subteam^${mention.id}>`;
+        const trailingText = (mention.user) ? `<@${mention.group}>` : `<!subteam^${mention.group}>`;
 
         return `${total}${leadingText}${trailingText}`
     }, '');
@@ -157,7 +163,12 @@ function restoreLocalErrorAndSend(currentDate, urlName, localErrorReportThreshol
     if (localErrorSince === undefined) return;
 
     const reportThreshold = localErrorReportThreshold || 60000;
-    const durationInLocalError = moment.duration(moment(currentDate).diff(moment(localErrorSince)));
+
+    const durationInLocalError = dateTimeFormat.formatRange(
+      currentDate,
+      localErrorSince
+    );
+
     const hasBeenMoreThanOneMinute = durationInLocalError.asMilliseconds() > reportThreshold;
 
     if (hasBeenMoreThanOneMinute) {
@@ -167,11 +178,6 @@ function restoreLocalErrorAndSend(currentDate, urlName, localErrorReportThreshol
     }
 
     urlErrorContainer[urlName] = undefined;
-}
-
-/* Get Timestamp */
-function getFormattedDate(date) {
-    return moment(date).format("DD-MM-YYYY_H:mm:ss")
 }
 
 const parseTimeRe = /^(\d|[0-1]\d|2[0-3]):([0-5]\d)\s*(|am|pm)$/i;

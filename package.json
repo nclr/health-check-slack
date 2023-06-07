@@ -4,8 +4,6 @@
   "description": "Health check app with Slack Notification",
   "main": "index.js",
   "dependencies": {
-    "moment": "^2.29.4",
-    "moment-duration-format": "^2.3.2",
     "request": "^2.85.0"
   },
   "devDependencies": {
