@@ -69,7 +69,7 @@ In the new `.env` file, replace the value with the new webhook URL you just crea
 
 -----------
 
-You're good to go! Just run `node index.js -r dotenv/config` and enjoy (you should probably deploy this to a server =p)
+You're good to go! Just run `npm run start` and enjoy (you should probably deploy this to a server =p)
 
 # Error Handling
 When a 404 status code incurs it sends "LinkName is not reachable!" and when the error with the specified link is resolved (and a 200 status code is returned) it automatically responds with "LinkName is reachable again!". Every "fail" notification requires at least two failed attempts in a row to reach the desired URL. This minimizes the possibility of some temporary connection problem on the health-check server masqueraded as a URL problem.
